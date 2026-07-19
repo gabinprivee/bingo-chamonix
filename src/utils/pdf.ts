@@ -2,8 +2,19 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { BingoGame } from '../types';
 
-export const exportToPDF = (currentNumbers: number[], pastGames: BingoGame[]) => {
+export const exportToPDF = (currentNumbers: number[], pastGames: BingoGame[], themeColor: string = 'rose') => {
   const doc = new jsPDF();
+  
+  const THEME_COLORS: Record<string, [number, number, number]> = {
+    rose: [225, 29, 72],
+    blue: [37, 99, 235],
+    green: [16, 185, 129],
+    purple: [147, 51, 234],
+    amber: [245, 158, 11]
+  };
+  
+  const fillColor = THEME_COLORS[themeColor] || THEME_COLORS['rose'];
+
   doc.setFontSize(18);
   doc.text('Historique Bingo', 14, 22);
 
@@ -40,7 +51,7 @@ export const exportToPDF = (currentNumbers: number[], pastGames: BingoGame[]) =>
       body: tableData,
       startY: startY,
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [225, 29, 72] }, // rose-600
+      headStyles: { fillColor },
     });
   }
 

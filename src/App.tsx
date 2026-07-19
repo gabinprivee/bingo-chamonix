@@ -25,6 +25,7 @@ export default function App() {
   });
   
   const [isDrawing, setIsDrawing] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -36,6 +37,9 @@ export default function App() {
   const [isSoundEnabled, setIsSoundEnabled] = useState(() => {
     return localStorage.getItem('bingo_sound') !== 'false';
   });
+  const [themeColor, setThemeColor] = useState<'rose' | 'blue' | 'green' | 'purple' | 'amber'>(() => {
+    return (localStorage.getItem('theme_color') as any) || 'rose';
+  });
   const historyListRef = useRef<HTMLDivElement>(null);
 
   const toggleSound = () => {
@@ -43,6 +47,11 @@ export default function App() {
     setIsSoundEnabled(newState);
     audioEngine.toggle(newState);
   };
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', themeColor);
+    localStorage.setItem('theme_color', themeColor);
+  }, [themeColor]);
 
   useEffect(() => {
     if (isDark) {
@@ -70,28 +79,41 @@ export default function App() {
     localStorage.setItem('bingo_max', maxNumber.toString());
   }, [maxNumber]);
 
-  const handleDraw = () => {
+  const triggerDraw = (forcedNumber?: number) => {
     if (currentNumbers.length >= maxNumber || isDrawing) return;
     
+    setIsDrawing(true);
+    setCountdown(3);
+
     if (isSoundEnabled) {
       audioEngine.init();
       audioEngine.playShuffleTick();
-      const interval = setInterval(() => audioEngine.playShuffleTick(), 150);
-      setTimeout(() => clearInterval(interval), 500);
     }
 
-    setIsDrawing(true);
-    setTimeout(() => {
-      setCurrentNumbers(prev => {
-        const newNum = drawBingoNumber(prev, maxNumber);
-        if (newNum !== null) {
-          if (isSoundEnabled) audioEngine.playDrawSound();
-          return [...prev, newNum];
-        }
-        return prev;
-      });
-      setIsDrawing(false);
-    }, 600);
+    let count = 3;
+    const interval = setInterval(() => {
+      count -= 1;
+      if (count > 0) {
+        setCountdown(count);
+        if (isSoundEnabled) audioEngine.playShuffleTick();
+      } else {
+        clearInterval(interval);
+        setCountdown(null);
+        setCurrentNumbers(prev => {
+          let nextNum = forcedNumber ?? drawBingoNumber(prev, maxNumber);
+          if (nextNum !== null && !prev.includes(nextNum)) {
+            if (isSoundEnabled) audioEngine.playDrawSound();
+            return [...prev, nextNum];
+          }
+          return prev;
+        });
+        setIsDrawing(false);
+      }
+    }, 1000);
+  };
+
+  const handleDraw = () => {
+    triggerDraw();
   };
 
   const handleNewGame = () => {
@@ -141,25 +163,7 @@ export default function App() {
           const remainingTargets = TARGET_NUMBERS.filter(n => !currentNumbers.includes(n) && n <= maxNumber);
           if (remainingTargets.length > 0) {
             const nextNum = remainingTargets[Math.floor(Math.random() * remainingTargets.length)];
-            
-            if (isSoundEnabled) {
-              audioEngine.init();
-              audioEngine.playShuffleTick();
-              const interval = setInterval(() => audioEngine.playShuffleTick(), 150);
-              setTimeout(() => clearInterval(interval), 500);
-            }
-
-            setIsDrawing(true);
-            setTimeout(() => {
-              setCurrentNumbers(prev => {
-                if (!prev.includes(nextNum)) {
-                  if (isSoundEnabled) audioEngine.playDrawSound();
-                  return [...prev, nextNum];
-                }
-                return prev;
-              });
-              setIsDrawing(false);
-            }, 600);
+            triggerDraw(nextNum);
           }
         }
       }
@@ -218,12 +222,28 @@ export default function App() {
       {/* Header */}
       <header className="p-4 sm:p-6 flex justify-between items-center max-w-6xl mx-auto border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-rose-600 rounded-xl text-white shadow-sm shadow-rose-200 dark:shadow-rose-900/20">
+          <div className="p-2.5 bg-primary-600 rounded-xl text-white shadow-sm shadow-primary-200 dark:shadow-primary-900/20">
             <Ticket size={24} />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Bingo Studio</h1>
         </div>
         <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-1.5 mr-2 bg-white dark:bg-gray-800 p-1.5 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm">
+            {(['rose', 'blue', 'green', 'purple', 'amber'] as const).map(color => (
+              <button
+                key={color}
+                onClick={() => setThemeColor(color)}
+                className={`w-5 h-5 rounded-full transition-all ${themeColor === color ? 'scale-110 ring-2 ring-offset-2 dark:ring-offset-gray-800' : 'hover:scale-110 opacity-70 hover:opacity-100'} ${
+                  color === 'rose' ? 'bg-rose-500 ring-rose-500' :
+                  color === 'blue' ? 'bg-blue-500 ring-blue-500' :
+                  color === 'green' ? 'bg-emerald-500 ring-emerald-500' :
+                  color === 'purple' ? 'bg-purple-500 ring-purple-500' :
+                  'bg-amber-500 ring-amber-500'
+                }`}
+                title={`Thème ${color}`}
+              />
+            ))}
+          </div>
           <button
             onClick={toggleSound}
             className="p-2.5 rounded-full bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
@@ -243,7 +263,7 @@ export default function App() {
             className="p-2.5 rounded-full bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
             title="Basculer le mode sombre"
           >
-            {isDark ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} className="text-rose-600" />}
+            {isDark ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} className="text-primary-600" />}
           </button>
         </div>
       </header>
@@ -255,7 +275,7 @@ export default function App() {
           
           {/* Active Draw Card */}
           <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 sm:p-10 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col items-center justify-center relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-rose-400 to-rose-600"></div>
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary-400 to-primary-600"></div>
             
             <h2 className="text-sm font-semibold tracking-widest uppercase mb-8 text-gray-400 dark:text-gray-500">
               Dernier Numéro Sorti
@@ -264,23 +284,39 @@ export default function App() {
             <div className="h-40 flex items-center justify-center mb-10 w-full">
               <AnimatePresence mode="popLayout">
                 {isDrawing ? (
-                  <motion.div
-                    key="drawing"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    className="text-rose-500 flex flex-col items-center gap-4"
-                  >
-                    <div className="w-12 h-12 border-4 border-rose-500 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="font-medium animate-pulse text-sm uppercase tracking-widest text-rose-400">Mélange...</p>
-                  </motion.div>
+                  countdown !== null ? (
+                    <motion.div
+                      key={`countdown-${countdown}`}
+                      initial={{ opacity: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 1.5 }}
+                      transition={{ duration: 0.3 }}
+                      className="text-primary-500 flex flex-col items-center justify-center"
+                    >
+                      <div className="text-7xl font-bold mb-2">
+                        {countdown}
+                      </div>
+                      <p className="font-medium animate-pulse text-sm uppercase tracking-widest text-primary-400">Suspense...</p>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="drawing"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="text-primary-500 flex flex-col items-center gap-4"
+                    >
+                      <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                      <p className="font-medium animate-pulse text-sm uppercase tracking-widest text-primary-400">Mélange...</p>
+                    </motion.div>
+                  )
                 ) : lastNumber ? (
                   <motion.div
                     key={`num-${lastNumber}`}
                     initial={{ opacity: 0, y: 50, scale: 0.3, rotate: -45 }}
                     animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
                     transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                    className="w-32 h-32 sm:w-40 sm:h-40 bg-rose-600 text-white rounded-full flex items-center justify-center text-5xl sm:text-7xl font-bold shadow-xl shadow-rose-600/30 border-8 border-rose-500"
+                    className="w-32 h-32 sm:w-40 sm:h-40 bg-primary-600 text-white rounded-full flex items-center justify-center text-5xl sm:text-7xl font-bold shadow-xl shadow-primary-600/30 border-8 border-primary-500"
                   >
                     {lastNumber}
                   </motion.div>
@@ -301,7 +337,7 @@ export default function App() {
               <button
                 onClick={handleDraw}
                 disabled={isDrawing || currentNumbers.length >= maxNumber}
-                className="bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400 disabled:cursor-not-allowed text-white px-8 py-4 rounded-2xl font-semibold text-lg transition-all active:scale-95 shadow-lg shadow-rose-600/20 flex items-center gap-3 justify-center min-w-[220px]"
+                className="bg-primary-600 hover:bg-primary-700 disabled:bg-primary-400 disabled:cursor-not-allowed text-white px-8 py-4 rounded-2xl font-semibold text-lg transition-all active:scale-95 shadow-lg shadow-primary-600/20 flex items-center gap-3 justify-center min-w-[220px]"
               >
                 <Ticket size={24} className={isDrawing ? "animate-bounce" : ""} />
                 {isDrawing ? 'Tirage...' : 'Tirer un numéro'}
@@ -312,7 +348,7 @@ export default function App() {
                 disabled={isDrawing || currentNumbers.length === 0}
                 className={`px-6 py-4 rounded-2xl font-semibold transition-all flex items-center gap-3 justify-center border-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                   showNewGameConfirm 
-                    ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/40' 
+                    ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 border-primary-200 dark:border-primary-800 hover:bg-primary-100 dark:hover:bg-primary-900/40' 
                     : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700'
                 }`}
               >
@@ -327,7 +363,7 @@ export default function App() {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 Grille de contrôle
-                <span className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-xs py-1 px-2.5 rounded-full font-bold">
+                <span className="bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 text-xs py-1 px-2.5 rounded-full font-bold">
                   {currentNumbers.length} / {maxNumber}
                 </span>
               </h2>
@@ -350,9 +386,9 @@ export default function App() {
                     transition={{ type: "spring", stiffness: 300, damping: 15 }}
                     className={`aspect-square flex items-center justify-center rounded-lg text-xs sm:text-sm md:text-base font-semibold transition-colors duration-300 ${
                       isLast 
-                        ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/50 z-10 ring-2 ring-offset-1 ring-rose-400 dark:ring-offset-gray-800'
+                        ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/50 z-10 ring-2 ring-offset-1 ring-primary-400 dark:ring-offset-gray-800'
                         : isDrawn
-                          ? 'bg-rose-500/90 text-white shadow-sm'
+                          ? 'bg-primary-500/90 text-white shadow-sm'
                           : 'bg-gray-50 dark:bg-gray-700/50 text-gray-400 dark:text-gray-500 border border-gray-100 dark:border-gray-700/50'
                     }`}
                   >
@@ -371,7 +407,7 @@ export default function App() {
           <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                <BarChart2 size={20} className="text-rose-500" />
+                <BarChart2 size={20} className="text-primary-500" />
                 Statistiques
               </h2>
               <select
@@ -388,7 +424,7 @@ export default function App() {
                   }
                   setMaxNumber(Number(e.target.value));
                 }}
-                className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm rounded-lg focus:ring-rose-500 focus:border-rose-500 block p-1.5"
+                className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block p-1.5"
               >
                 <option value={75}>75 (US)</option>
                 <option value={90}>90 (EU)</option>
@@ -403,11 +439,20 @@ export default function App() {
                 <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Impairs</span>
                 <span className="text-xl font-bold text-gray-800 dark:text-gray-100">{oddCount}</span>
               </div>
-              <div className="bg-rose-50 dark:bg-rose-900/20 p-3 rounded-2xl border border-rose-100 dark:border-rose-800/50 flex flex-col items-center justify-center text-center">
-                <span className="text-[10px] sm:text-xs text-rose-600 dark:text-rose-400 font-medium uppercase tracking-wider mb-1 leading-tight">N° + Fréquent</span>
-                <span className="text-xl font-bold text-rose-700 dark:text-rose-300">{getMostFrequentNumber()}</span>
+              <div className="bg-primary-50 dark:bg-primary-900/20 p-3 rounded-2xl border border-primary-100 dark:border-primary-800/50 flex flex-col items-center justify-center text-center">
+                <span className="text-[10px] sm:text-xs text-primary-600 dark:text-primary-400 font-medium uppercase tracking-wider mb-1 leading-tight">N° + Fréquent</span>
+                <span className="text-xl font-bold text-primary-700 dark:text-primary-300">{getMostFrequentNumber()}</span>
               </div>
             </div>
+            
+            {currentNumbers.length < maxNumber && (
+              <div className="mt-4 bg-sky-50 dark:bg-sky-900/20 p-3.5 rounded-xl border border-sky-100 dark:border-sky-800/50 flex items-center justify-between">
+                <span className="text-sm text-sky-700 dark:text-sky-300 font-medium">Probabilité d'un N° spécifique</span>
+                <span className="text-sm font-bold text-sky-800 dark:text-sky-200 bg-white dark:bg-gray-800 px-2 py-1 rounded-md shadow-sm">
+                  {((1 / (maxNumber - currentNumbers.length)) * 100).toFixed(2)}%
+                </span>
+              </div>
+            )}
           </section>
 
           <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex-1 flex flex-col min-h-[400px] max-h-[850px]">
@@ -418,8 +463,8 @@ export default function App() {
               <div className="flex gap-2">
                 {(pastGames.length > 0 || currentNumbers.length > 0) && (
                   <button
-                    onClick={() => exportToPDF(currentNumbers, pastGames)}
-                    className="p-2 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-xl transition-colors flex items-center gap-2 font-medium border border-rose-100 dark:border-rose-800/50"
+                    onClick={() => exportToPDF(currentNumbers, pastGames, themeColor)}
+                    className="p-2 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-xl transition-colors flex items-center gap-2 font-medium border border-primary-100 dark:border-primary-800/50"
                     title="Exporter l'historique en PDF"
                   >
                     <Download size={18} />
@@ -482,7 +527,7 @@ export default function App() {
                       animate={{ opacity: 1, x: 0 }}
                       className={`p-3 rounded-xl flex justify-between items-center border ${
                         isLast 
-                          ? 'bg-rose-50 border-rose-200 dark:bg-rose-900/20 dark:border-rose-800/50' 
+                          ? 'bg-primary-50 border-primary-200 dark:bg-primary-900/20 dark:border-primary-800/50' 
                           : 'bg-gray-50 border-gray-100 dark:bg-gray-700/30 dark:border-gray-700/50'
                       }`}
                     >
@@ -491,7 +536,7 @@ export default function App() {
                       </span>
                       <span className={`w-8 h-8 flex items-center justify-center rounded-full font-bold shadow-sm ${
                         isLast
-                          ? 'bg-rose-600 text-white'
+                          ? 'bg-primary-600 text-white'
                           : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
                       }`}>
                         {num}
