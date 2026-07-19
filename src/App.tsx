@@ -34,11 +34,18 @@ export default function App() {
     const saved = localStorage.getItem('bingo_max');
     return saved ? parseInt(saved, 10) : 90;
   });
+  const [countdownDuration, setCountdownDuration] = useState<number>(() => {
+    const saved = localStorage.getItem('bingo_countdown_duration');
+    return saved ? parseInt(saved, 10) : 3;
+  });
   const [isSoundEnabled, setIsSoundEnabled] = useState(() => {
     return localStorage.getItem('bingo_sound') !== 'false';
   });
-  const [themeColor, setThemeColor] = useState<'rose' | 'blue' | 'green' | 'purple' | 'amber'>(() => {
-    return (localStorage.getItem('theme_color') as any) || 'rose';
+  const [themeColor, setThemeColor] = useState<string>(() => {
+    return localStorage.getItem('theme_color') || 'rose';
+  });
+  const [customColor, setCustomColor] = useState<string>(() => {
+    return localStorage.getItem('custom_color') || '#f43f5e';
   });
   const historyListRef = useRef<HTMLDivElement>(null);
 
@@ -51,7 +58,13 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', themeColor);
     localStorage.setItem('theme_color', themeColor);
-  }, [themeColor]);
+    if (themeColor === 'custom') {
+      document.documentElement.style.setProperty('--theme-base', customColor);
+      localStorage.setItem('custom_color', customColor);
+    } else {
+      document.documentElement.style.removeProperty('--theme-base');
+    }
+  }, [themeColor, customColor]);
 
   useEffect(() => {
     if (isDark) {
@@ -79,18 +92,22 @@ export default function App() {
     localStorage.setItem('bingo_max', maxNumber.toString());
   }, [maxNumber]);
 
+  useEffect(() => {
+    localStorage.setItem('bingo_countdown_duration', countdownDuration.toString());
+  }, [countdownDuration]);
+
   const triggerDraw = (forcedNumber?: number) => {
     if (currentNumbers.length >= maxNumber || isDrawing) return;
     
     setIsDrawing(true);
-    setCountdown(3);
+    setCountdown(countdownDuration);
 
     if (isSoundEnabled) {
       audioEngine.init();
       audioEngine.playShuffleTick();
     }
 
-    let count = 3;
+    let count = countdownDuration;
     const interval = setInterval(() => {
       count -= 1;
       if (count > 0) {
@@ -228,21 +245,18 @@ export default function App() {
           <h1 className="text-2xl font-bold tracking-tight">Bingo Studio</h1>
         </div>
         <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-1.5 mr-2 bg-white dark:bg-gray-800 p-1.5 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm">
-            {(['rose', 'blue', 'green', 'purple', 'amber'] as const).map(color => (
-              <button
-                key={color}
-                onClick={() => setThemeColor(color)}
-                className={`w-5 h-5 rounded-full transition-all ${themeColor === color ? 'scale-110 ring-2 ring-offset-2 dark:ring-offset-gray-800' : 'hover:scale-110 opacity-70 hover:opacity-100'} ${
-                  color === 'rose' ? 'bg-rose-500 ring-rose-500' :
-                  color === 'blue' ? 'bg-blue-500 ring-blue-500' :
-                  color === 'green' ? 'bg-emerald-500 ring-emerald-500' :
-                  color === 'purple' ? 'bg-purple-500 ring-purple-500' :
-                  'bg-amber-500 ring-amber-500'
-                }`}
-                title={`Thème ${color}`}
-              />
-            ))}
+          <div className="hidden sm:flex items-center gap-2 mr-2 bg-white dark:bg-gray-800 p-1.5 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm flex-wrap max-w-[250px] justify-center">
+            <input
+              type="color"
+              value={customColor}
+              onChange={(e) => {
+                setCustomColor(e.target.value);
+                setThemeColor('custom');
+              }}
+              className="w-7 h-7 rounded-full cursor-pointer bg-transparent border-0 p-0 overflow-hidden"
+              style={{ clipPath: 'circle(50%)' }}
+              title="Choisir une couleur personnalisée"
+            />
           </div>
           <button
             onClick={toggleSound}
@@ -410,25 +424,38 @@ export default function App() {
                 <BarChart2 size={20} className="text-primary-500" />
                 Statistiques
               </h2>
-              <select
-                value={maxNumber}
-                onChange={(e) => {
-                  if (currentNumbers.length > 0) {
-                    if (!confirm("Changer le nombre maximum réinitialisera la partie en cours. Continuer ?")) return;
-                    setPastGames(prev => [{
-                      id: crypto.randomUUID(),
-                      timestamp: Date.now(),
-                      numbers: currentNumbers
-                    }, ...prev]);
-                    setCurrentNumbers([]);
-                  }
-                  setMaxNumber(Number(e.target.value));
-                }}
-                className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block p-1.5"
-              >
-                <option value={75}>75 (US)</option>
-                <option value={90}>90 (EU)</option>
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={countdownDuration}
+                  onChange={(e) => setCountdownDuration(Number(e.target.value))}
+                  className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block p-1.5"
+                  title="Durée du compte à rebours"
+                >
+                  <option value={1}>1s</option>
+                  <option value={3}>3s</option>
+                  <option value={5}>5s</option>
+                </select>
+                <select
+                  value={maxNumber}
+                  onChange={(e) => {
+                    if (currentNumbers.length > 0) {
+                      if (!confirm("Changer le nombre maximum réinitialisera la partie en cours. Continuer ?")) return;
+                      setPastGames(prev => [{
+                        id: crypto.randomUUID(),
+                        timestamp: Date.now(),
+                        numbers: currentNumbers
+                      }, ...prev]);
+                      setCurrentNumbers([]);
+                    }
+                    setMaxNumber(Number(e.target.value));
+                  }}
+                  className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block p-1.5"
+                  title="Maximum de numéros"
+                >
+                  <option value={75}>75 (US)</option>
+                  <option value={90}>90 (EU)</option>
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-gray-50 dark:bg-gray-700/30 p-3 rounded-2xl border border-gray-100 dark:border-gray-700/50 flex flex-col items-center justify-center">
@@ -463,7 +490,7 @@ export default function App() {
               <div className="flex gap-2">
                 {(pastGames.length > 0 || currentNumbers.length > 0) && (
                   <button
-                    onClick={() => exportToPDF(currentNumbers, pastGames, themeColor)}
+                    onClick={() => exportToPDF(currentNumbers, pastGames, themeColor === 'custom' ? customColor : themeColor)}
                     className="p-2 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-xl transition-colors flex items-center gap-2 font-medium border border-primary-100 dark:border-primary-800/50"
                     title="Exporter l'historique en PDF"
                   >

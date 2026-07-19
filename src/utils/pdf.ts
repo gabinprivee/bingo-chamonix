@@ -10,10 +10,26 @@ export const exportToPDF = (currentNumbers: number[], pastGames: BingoGame[], th
     blue: [37, 99, 235],
     green: [16, 185, 129],
     purple: [147, 51, 234],
-    amber: [245, 158, 11]
+    amber: [245, 158, 11],
+    red: [239, 68, 68],
+    orange: [249, 115, 22],
+    yellow: [234, 179, 8],
+    teal: [20, 184, 166],
+    cyan: [6, 182, 212],
+    indigo: [99, 102, 241],
+    pink: [236, 72, 153]
   };
   
-  const fillColor = THEME_COLORS[themeColor] || THEME_COLORS['rose'];
+  let fillColor: [number, number, number] = THEME_COLORS['rose'];
+  
+  if (themeColor.startsWith('#')) {
+    const r = parseInt(themeColor.slice(1, 3), 16);
+    const g = parseInt(themeColor.slice(3, 5), 16);
+    const b = parseInt(themeColor.slice(5, 7), 16);
+    fillColor = [r, g, b];
+  } else if (THEME_COLORS[themeColor]) {
+    fillColor = THEME_COLORS[themeColor];
+  }
 
   doc.setFontSize(18);
   doc.text('Historique Bingo', 14, 22);

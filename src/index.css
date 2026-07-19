@@ -103,3 +103,108 @@ body {
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
   @apply bg-gray-700;
 }
+
+:root[data-theme="red"] {
+  --theme-50: var(--color-red-50);
+  --theme-100: var(--color-red-100);
+  --theme-200: var(--color-red-200);
+  --theme-300: var(--color-red-300);
+  --theme-400: var(--color-red-400);
+  --theme-500: var(--color-red-500);
+  --theme-600: var(--color-red-600);
+  --theme-700: var(--color-red-700);
+  --theme-800: var(--color-red-800);
+  --theme-900: var(--color-red-900);
+}
+
+:root[data-theme="orange"] {
+  --theme-50: var(--color-orange-50);
+  --theme-100: var(--color-orange-100);
+  --theme-200: var(--color-orange-200);
+  --theme-300: var(--color-orange-300);
+  --theme-400: var(--color-orange-400);
+  --theme-500: var(--color-orange-500);
+  --theme-600: var(--color-orange-600);
+  --theme-700: var(--color-orange-700);
+  --theme-800: var(--color-orange-800);
+  --theme-900: var(--color-orange-900);
+}
+
+:root[data-theme="yellow"] {
+  --theme-50: var(--color-yellow-50);
+  --theme-100: var(--color-yellow-100);
+  --theme-200: var(--color-yellow-200);
+  --theme-300: var(--color-yellow-300);
+  --theme-400: var(--color-yellow-400);
+  --theme-500: var(--color-yellow-500);
+  --theme-600: var(--color-yellow-600);
+  --theme-700: var(--color-yellow-700);
+  --theme-800: var(--color-yellow-800);
+  --theme-900: var(--color-yellow-900);
+}
+
+:root[data-theme="teal"] {
+  --theme-50: var(--color-teal-50);
+  --theme-100: var(--color-teal-100);
+  --theme-200: var(--color-teal-200);
+  --theme-300: var(--color-teal-300);
+  --theme-400: var(--color-teal-400);
+  --theme-500: var(--color-teal-500);
+  --theme-600: var(--color-teal-600);
+  --theme-700: var(--color-teal-700);
+  --theme-800: var(--color-teal-800);
+  --theme-900: var(--color-teal-900);
+}
+
+:root[data-theme="cyan"] {
+  --theme-50: var(--color-cyan-50);
+  --theme-100: var(--color-cyan-100);
+  --theme-200: var(--color-cyan-200);
+  --theme-300: var(--color-cyan-300);
+  --theme-400: var(--color-cyan-400);
+  --theme-500: var(--color-cyan-500);
+  --theme-600: var(--color-cyan-600);
+  --theme-700: var(--color-cyan-700);
+  --theme-800: var(--color-cyan-800);
+  --theme-900: var(--color-cyan-900);
+}
+
+:root[data-theme="indigo"] {
+  --theme-50: var(--color-indigo-50);
+  --theme-100: var(--color-indigo-100);
+  --theme-200: var(--color-indigo-200);
+  --theme-300: var(--color-indigo-300);
+  --theme-400: var(--color-indigo-400);
+  --theme-500: var(--color-indigo-500);
+  --theme-600: var(--color-indigo-600);
+  --theme-700: var(--color-indigo-700);
+  --theme-800: var(--color-indigo-800);
+  --theme-900: var(--color-indigo-900);
+}
+
+:root[data-theme="pink"] {
+  --theme-50: var(--color-pink-50);
+  --theme-100: var(--color-pink-100);
+  --theme-200: var(--color-pink-200);
+  --theme-300: var(--color-pink-300);
+  --theme-400: var(--color-pink-400);
+  --theme-500: var(--color-pink-500);
+  --theme-600: var(--color-pink-600);
+  --theme-700: var(--color-pink-700);
+  --theme-800: var(--color-pink-800);
+  --theme-900: var(--color-pink-900);
+}
+
+:root[data-theme="custom"] {
+  --theme-base: #f43f5e;
+  --theme-50: color-mix(in srgb, var(--theme-base) 10%, white);
+  --theme-100: color-mix(in srgb, var(--theme-base) 20%, white);
+  --theme-200: color-mix(in srgb, var(--theme-base) 40%, white);
+  --theme-300: color-mix(in srgb, var(--theme-base) 60%, white);
+  --theme-400: color-mix(in srgb, var(--theme-base) 80%, white);
+  --theme-500: var(--theme-base);
+  --theme-600: color-mix(in srgb, var(--theme-base) 85%, black);
+  --theme-700: color-mix(in srgb, var(--theme-base) 70%, black);
+  --theme-800: color-mix(in srgb, var(--theme-base) 50%, black);
+  --theme-900: color-mix(in srgb, var(--theme-base) 30%, black);
+}
