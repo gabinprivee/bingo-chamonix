@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { drawBingoNumber } from './utils/bingo';
 import { exportToPDF } from './utils/pdf';
 import { BingoGame } from './types';
-import { Moon, Sun, Download, Trash2, Ticket, RotateCcw } from 'lucide-react';
+import { Moon, Sun, Download, Trash2, Ticket, RotateCcw, Maximize, Minimize, BarChart2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
@@ -24,6 +24,7 @@ export default function App() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const historyListRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,14 +50,17 @@ export default function App() {
   }, [currentNumbers]);
 
   const handleDraw = () => {
-    if (currentNumbers.length >= 90) return;
+    if (currentNumbers.length >= 90 || isDrawing) return;
     
     setIsDrawing(true);
     setTimeout(() => {
-      const newNum = drawBingoNumber(currentNumbers);
-      if (newNum !== null) {
-        setCurrentNumbers(prev => [...prev, newNum]);
-      }
+      setCurrentNumbers(prev => {
+        const newNum = drawBingoNumber(prev);
+        if (newNum !== null) {
+          return [...prev, newNum];
+        }
+        return prev;
+      });
       setIsDrawing(false);
     }, 600);
   };
@@ -88,6 +92,69 @@ export default function App() {
     setShowClearConfirm(false);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!isDrawing && currentNumbers.length < 90) {
+          handleDraw();
+        }
+      } else if (e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        if (!isDrawing && currentNumbers.length > 0) {
+          handleNewGame();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDrawing, currentNumbers, showNewGameConfirm, showClearConfirm]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+
+  const getMostFrequentNumber = () => {
+    const allDrawn = [...pastGames.flatMap(g => g.numbers), ...currentNumbers];
+    if (allDrawn.length === 0) return "-";
+    
+    const counts = new Map<number, number>();
+    let maxCount = 0;
+    let mostFreq = allDrawn[0];
+    
+    for (const num of allDrawn) {
+      const count = (counts.get(num) || 0) + 1;
+      counts.set(num, count);
+      if (count > maxCount) {
+        maxCount = count;
+        mostFreq = num;
+      }
+    }
+    return `${mostFreq}`;
+  };
+
+  const evenCount = currentNumbers.filter(n => n % 2 === 0).length;
+  const oddCount = currentNumbers.filter(n => n % 2 !== 0).length;
+
   const lastNumber = currentNumbers.length > 0 ? currentNumbers[currentNumbers.length - 1] : null;
 
   return (
@@ -100,13 +167,22 @@ export default function App() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Bingo Studio</h1>
         </div>
-        <button
-          onClick={() => setIsDark(!isDark)}
-          className="p-2.5 rounded-full bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          aria-label="Basculer le mode sombre"
-        >
-          {isDark ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} className="text-rose-600" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleFullScreen}
+            className="p-2.5 rounded-full bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            title={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
+          >
+            {isFullscreen ? <Minimize size={20} className="text-gray-600 dark:text-gray-300" /> : <Maximize size={20} className="text-gray-600 dark:text-gray-300" />}
+          </button>
+          <button
+            onClick={() => setIsDark(!isDark)}
+            className="p-2.5 rounded-full bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            title="Basculer le mode sombre"
+          >
+            {isDark ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} className="text-rose-600" />}
+          </button>
+        </div>
       </header>
 
       <main className="max-w-6xl mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 mt-4 sm:mt-8">
@@ -219,7 +295,29 @@ export default function App() {
 
         {/* History Section */}
         <div className="lg:col-span-4 flex flex-col gap-6">
-          <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex-1 flex flex-col min-h-[500px] max-h-[850px]">
+          {/* Stats Panel */}
+          <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col">
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+              <BarChart2 size={20} className="text-rose-500" />
+              Statistiques
+            </h2>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-gray-50 dark:bg-gray-700/30 p-3 rounded-2xl border border-gray-100 dark:border-gray-700/50 flex flex-col items-center justify-center">
+                <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Pairs</span>
+                <span className="text-xl font-bold text-gray-800 dark:text-gray-100">{evenCount}</span>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-700/30 p-3 rounded-2xl border border-gray-100 dark:border-gray-700/50 flex flex-col items-center justify-center">
+                <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Impairs</span>
+                <span className="text-xl font-bold text-gray-800 dark:text-gray-100">{oddCount}</span>
+              </div>
+              <div className="bg-rose-50 dark:bg-rose-900/20 p-3 rounded-2xl border border-rose-100 dark:border-rose-800/50 flex flex-col items-center justify-center text-center">
+                <span className="text-[10px] sm:text-xs text-rose-600 dark:text-rose-400 font-medium uppercase tracking-wider mb-1 leading-tight">N° + Fréquent</span>
+                <span className="text-xl font-bold text-rose-700 dark:text-rose-300">{getMostFrequentNumber()}</span>
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex-1 flex flex-col min-h-[400px] max-h-[850px]">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
                 Séquence du tirage
