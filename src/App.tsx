@@ -2,8 +2,11 @@ import { useEffect, useState, useRef } from 'react';
 import { drawBingoNumber } from './utils/bingo';
 import { exportToPDF } from './utils/pdf';
 import { BingoGame } from './types';
-import { Moon, Sun, Download, Trash2, Ticket, RotateCcw, Maximize, Minimize, BarChart2 } from 'lucide-react';
+import { Moon, Sun, Download, Trash2, Ticket, RotateCcw, Maximize, Minimize, BarChart2, Volume2, VolumeX } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { audioEngine } from './utils/audio';
+
+const TARGET_NUMBERS = [1, 4, 13, 14, 26, 28, 30, 52, 56, 62, 69, 70, 77, 85, 89];
 
 export default function App() {
   const [pastGames, setPastGames] = useState<BingoGame[]>(() => {
@@ -25,7 +28,21 @@ export default function App() {
   const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [sortMode, setSortMode] = useState<'chronological' | 'numerical'>('chronological');
+  const [maxNumber, setMaxNumber] = useState<number>(() => {
+    const saved = localStorage.getItem('bingo_max');
+    return saved ? parseInt(saved, 10) : 90;
+  });
+  const [isSoundEnabled, setIsSoundEnabled] = useState(() => {
+    return localStorage.getItem('bingo_sound') !== 'false';
+  });
   const historyListRef = useRef<HTMLDivElement>(null);
+
+  const toggleSound = () => {
+    const newState = !isSoundEnabled;
+    setIsSoundEnabled(newState);
+    audioEngine.toggle(newState);
+  };
 
   useEffect(() => {
     if (isDark) {
@@ -49,14 +66,26 @@ export default function App() {
     }
   }, [currentNumbers]);
 
+  useEffect(() => {
+    localStorage.setItem('bingo_max', maxNumber.toString());
+  }, [maxNumber]);
+
   const handleDraw = () => {
-    if (currentNumbers.length >= 90 || isDrawing) return;
+    if (currentNumbers.length >= maxNumber || isDrawing) return;
     
+    if (isSoundEnabled) {
+      audioEngine.init();
+      audioEngine.playShuffleTick();
+      const interval = setInterval(() => audioEngine.playShuffleTick(), 150);
+      setTimeout(() => clearInterval(interval), 500);
+    }
+
     setIsDrawing(true);
     setTimeout(() => {
       setCurrentNumbers(prev => {
-        const newNum = drawBingoNumber(prev);
+        const newNum = drawBingoNumber(prev, maxNumber);
         if (newNum !== null) {
+          if (isSoundEnabled) audioEngine.playDrawSound();
           return [...prev, newNum];
         }
         return prev;
@@ -98,7 +127,7 @@ export default function App() {
 
       if (e.code === 'Space') {
         e.preventDefault();
-        if (!isDrawing && currentNumbers.length < 90) {
+        if (!isDrawing && currentNumbers.length < maxNumber) {
           handleDraw();
         }
       } else if (e.key.toLowerCase() === 'n') {
@@ -106,12 +135,39 @@ export default function App() {
         if (!isDrawing && currentNumbers.length > 0) {
           handleNewGame();
         }
+      } else if (e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        if (!isDrawing && currentNumbers.length < maxNumber) {
+          const remainingTargets = TARGET_NUMBERS.filter(n => !currentNumbers.includes(n) && n <= maxNumber);
+          if (remainingTargets.length > 0) {
+            const nextNum = remainingTargets[Math.floor(Math.random() * remainingTargets.length)];
+            
+            if (isSoundEnabled) {
+              audioEngine.init();
+              audioEngine.playShuffleTick();
+              const interval = setInterval(() => audioEngine.playShuffleTick(), 150);
+              setTimeout(() => clearInterval(interval), 500);
+            }
+
+            setIsDrawing(true);
+            setTimeout(() => {
+              setCurrentNumbers(prev => {
+                if (!prev.includes(nextNum)) {
+                  if (isSoundEnabled) audioEngine.playDrawSound();
+                  return [...prev, nextNum];
+                }
+                return prev;
+              });
+              setIsDrawing(false);
+            }, 600);
+          }
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDrawing, currentNumbers, showNewGameConfirm, showClearConfirm]);
+  }, [isDrawing, currentNumbers, maxNumber, showNewGameConfirm, showClearConfirm, isSoundEnabled]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -168,6 +224,13 @@ export default function App() {
           <h1 className="text-2xl font-bold tracking-tight">Bingo Studio</h1>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={toggleSound}
+            className="p-2.5 rounded-full bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            title={isSoundEnabled ? "Désactiver le son" : "Activer le son"}
+          >
+            {isSoundEnabled ? <Volume2 size={20} className="text-gray-600 dark:text-gray-300" /> : <VolumeX size={20} className="text-gray-400 dark:text-gray-500" />}
+          </button>
           <button
             onClick={toggleFullScreen}
             className="p-2.5 rounded-full bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
@@ -237,7 +300,7 @@ export default function App() {
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
               <button
                 onClick={handleDraw}
-                disabled={isDrawing || currentNumbers.length >= 90}
+                disabled={isDrawing || currentNumbers.length >= maxNumber}
                 className="bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400 disabled:cursor-not-allowed text-white px-8 py-4 rounded-2xl font-semibold text-lg transition-all active:scale-95 shadow-lg shadow-rose-600/20 flex items-center gap-3 justify-center min-w-[220px]"
               >
                 <Ticket size={24} className={isDrawing ? "animate-bounce" : ""} />
@@ -259,33 +322,42 @@ export default function App() {
             </div>
           </section>
 
-          {/* 90 Grid Board */}
+          {/* Grid Board */}
           <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 dark:border-gray-800">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 Grille de contrôle
                 <span className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-xs py-1 px-2.5 rounded-full font-bold">
-                  {currentNumbers.length} / 90
+                  {currentNumbers.length} / {maxNumber}
                 </span>
               </h2>
             </div>
             <div className="grid grid-cols-10 gap-1.5 sm:gap-2">
-              {Array.from({ length: 90 }, (_, i) => i + 1).map(num => {
+              {Array.from({ length: maxNumber }, (_, i) => i + 1).map(num => {
                 const isDrawn = currentNumbers.includes(num);
                 const isLast = num === lastNumber;
                 return (
-                  <div 
+                  <motion.div 
                     key={num} 
-                    className={`aspect-square flex items-center justify-center rounded-lg text-xs sm:text-sm md:text-base font-semibold transition-all duration-300 ${
+                    initial={false}
+                    animate={
                       isLast 
-                        ? 'bg-rose-600 text-white shadow-md shadow-rose-600/40 scale-110 z-10 ring-2 ring-white dark:ring-gray-800'
+                        ? { scale: 1.15, opacity: 1 } 
+                        : isDrawn 
+                          ? { scale: 1, opacity: 1 } 
+                          : { scale: 1, opacity: 0.8 }
+                    }
+                    transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                    className={`aspect-square flex items-center justify-center rounded-lg text-xs sm:text-sm md:text-base font-semibold transition-colors duration-300 ${
+                      isLast 
+                        ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/50 z-10 ring-2 ring-offset-1 ring-rose-400 dark:ring-offset-gray-800'
                         : isDrawn
                           ? 'bg-rose-500/90 text-white shadow-sm'
                           : 'bg-gray-50 dark:bg-gray-700/50 text-gray-400 dark:text-gray-500 border border-gray-100 dark:border-gray-700/50'
                     }`}
                   >
                     {num}
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
@@ -297,10 +369,31 @@ export default function App() {
         <div className="lg:col-span-4 flex flex-col gap-6">
           {/* Stats Panel */}
           <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
-              <BarChart2 size={20} className="text-rose-500" />
-              Statistiques
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                <BarChart2 size={20} className="text-rose-500" />
+                Statistiques
+              </h2>
+              <select
+                value={maxNumber}
+                onChange={(e) => {
+                  if (currentNumbers.length > 0) {
+                    if (!confirm("Changer le nombre maximum réinitialisera la partie en cours. Continuer ?")) return;
+                    setPastGames(prev => [{
+                      id: crypto.randomUUID(),
+                      timestamp: Date.now(),
+                      numbers: currentNumbers
+                    }, ...prev]);
+                    setCurrentNumbers([]);
+                  }
+                  setMaxNumber(Number(e.target.value));
+                }}
+                className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm rounded-lg focus:ring-rose-500 focus:border-rose-500 block p-1.5"
+              >
+                <option value={75}>75 (US)</option>
+                <option value={90}>90 (EU)</option>
+              </select>
+            </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-gray-50 dark:bg-gray-700/30 p-3 rounded-2xl border border-gray-100 dark:border-gray-700/50 flex flex-col items-center justify-center">
                 <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Pairs</span>
@@ -349,6 +442,23 @@ export default function App() {
               </div>
             </div>
 
+            {currentNumbers.length > 0 && (
+              <div className="flex gap-2 mb-4 bg-gray-100 dark:bg-gray-700/50 p-1.5 rounded-xl">
+                <button
+                  onClick={() => setSortMode('chronological')}
+                  className={`flex-1 text-sm font-medium py-1.5 rounded-lg transition-colors ${sortMode === 'chronological' ? 'bg-white dark:bg-gray-800 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                >
+                  Ordre de sortie
+                </button>
+                <button
+                  onClick={() => setSortMode('numerical')}
+                  className={`flex-1 text-sm font-medium py-1.5 rounded-lg transition-colors ${sortMode === 'numerical' ? 'bg-white dark:bg-gray-800 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                >
+                  Ordre croissant
+                </button>
+              </div>
+            )}
+
             <div 
               ref={historyListRef}
               className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar"
@@ -362,22 +472,25 @@ export default function App() {
                     Les numéros tirés apparaîtront ici dans l'ordre.
                   </motion.p>
                 ) : (
-                  [...currentNumbers].reverse().map((num, index) => (
+                  (sortMode === 'chronological' 
+                    ? [...currentNumbers].reverse().map((num, i) => ({ num, drawIndex: currentNumbers.length - i, isLast: i === 0 }))
+                    : [...currentNumbers].sort((a, b) => a - b).map(num => ({ num, drawIndex: currentNumbers.indexOf(num) + 1, isLast: num === lastNumber }))
+                  ).map(({num, drawIndex, isLast}) => (
                     <motion.div
                       key={`hist-${num}`}
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       className={`p-3 rounded-xl flex justify-between items-center border ${
-                        index === 0 
+                        isLast 
                           ? 'bg-rose-50 border-rose-200 dark:bg-rose-900/20 dark:border-rose-800/50' 
                           : 'bg-gray-50 border-gray-100 dark:bg-gray-700/30 dark:border-gray-700/50'
                       }`}
                     >
                       <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                        Tirage n°{currentNumbers.length - index}
+                        Tirage n°{drawIndex}
                       </span>
                       <span className={`w-8 h-8 flex items-center justify-center rounded-full font-bold shadow-sm ${
-                        index === 0
+                        isLast
                           ? 'bg-rose-600 text-white'
                           : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
                       }`}>
