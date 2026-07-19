@@ -1,0 +1,6 @@
+{
+  "name": "Bingo Studio",
+  "description": "Générateur de tirages de Bingo avec grille de 90 numéros, historique et export PDF.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
