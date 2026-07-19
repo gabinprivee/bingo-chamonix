@@ -2,9 +2,10 @@ import { useEffect, useState, useRef } from 'react';
 import { drawBingoNumber } from './utils/bingo';
 import { exportToPDF } from './utils/pdf';
 import { BingoGame } from './types';
-import { Moon, Sun, Download, Trash2, Ticket, RotateCcw, Maximize, Minimize, BarChart2, Volume2, VolumeX } from 'lucide-react';
+import { Moon, Sun, Download, Trash2, Ticket, RotateCcw, Maximize, Minimize, BarChart2, Volume2, VolumeX, Play, Pause } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { audioEngine } from './utils/audio';
+import { DiscordHandMonitor } from './components/DiscordHandMonitor';
 
 const TARGET_NUMBERS = [1, 4, 13, 14, 26, 28, 30, 52, 56, 62, 69, 70, 77, 85, 89];
 
@@ -25,6 +26,7 @@ export default function App() {
   });
   
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -48,6 +50,24 @@ export default function App() {
     return localStorage.getItem('custom_color') || '#f43f5e';
   });
   const historyListRef = useRef<HTMLDivElement>(null);
+
+  const triggerDrawRef = useRef<any>(null);
+  useEffect(() => {
+    triggerDrawRef.current = triggerDraw;
+  });
+
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+    if (isAutoPlaying && !isDrawing && currentNumbers.length < maxNumber) {
+      const delay = countdownDuration === 0 ? 3000 : 2000;
+      timeout = setTimeout(() => {
+        if (triggerDrawRef.current) triggerDrawRef.current();
+      }, delay);
+    } else if (currentNumbers.length >= maxNumber && isAutoPlaying) {
+      setIsAutoPlaying(false);
+    }
+    return () => clearTimeout(timeout);
+  }, [isAutoPlaying, isDrawing, currentNumbers.length, maxNumber, countdownDuration]);
 
   const toggleSound = () => {
     const newState = !isSoundEnabled;
@@ -100,6 +120,24 @@ export default function App() {
     if (currentNumbers.length >= maxNumber || isDrawing) return;
     
     setIsDrawing(true);
+
+    if (countdownDuration === 0) {
+      if (isSoundEnabled) audioEngine.init();
+      setCurrentNumbers(prev => {
+        let nextNum = forcedNumber ?? drawBingoNumber(prev, maxNumber);
+        if (nextNum !== null && !prev.includes(nextNum)) {
+          if (isSoundEnabled) {
+            audioEngine.playDrawSound();
+            setTimeout(() => audioEngine.speakNumber(nextNum), 300);
+          }
+          return [...prev, nextNum];
+        }
+        return prev;
+      });
+      setIsDrawing(false);
+      return;
+    }
+
     setCountdown(countdownDuration);
 
     if (isSoundEnabled) {
@@ -119,7 +157,11 @@ export default function App() {
         setCurrentNumbers(prev => {
           let nextNum = forcedNumber ?? drawBingoNumber(prev, maxNumber);
           if (nextNum !== null && !prev.includes(nextNum)) {
-            if (isSoundEnabled) audioEngine.playDrawSound();
+            if (isSoundEnabled) {
+              audioEngine.playDrawSound();
+              // Small delay to let the chime play before speaking
+              setTimeout(() => audioEngine.speakNumber(nextNum), 300);
+            }
             return [...prev, nextNum];
           }
           return prev;
@@ -134,6 +176,7 @@ export default function App() {
   };
 
   const handleNewGame = () => {
+    setIsAutoPlaying(false);
     if (currentNumbers.length === 0) return;
     if (!showNewGameConfirm) {
       setShowNewGameConfirm(true);
@@ -415,8 +458,10 @@ export default function App() {
 
         </div>
 
-        {/* History Section */}
+        {/* History Section & Extras */}
         <div className="lg:col-span-4 flex flex-col gap-6">
+          <DiscordHandMonitor />
+          
           {/* Stats Panel */}
           <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col">
             <div className="flex justify-between items-center mb-4">
@@ -425,12 +470,25 @@ export default function App() {
                 Statistiques
               </h2>
               <div className="flex gap-2">
+                <button
+                  onClick={() => setIsAutoPlaying(!isAutoPlaying)}
+                  className={`p-1.5 rounded-lg border text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                    isAutoPlaying 
+                      ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400' 
+                      : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                  title={isAutoPlaying ? "Arrêter la lecture automatique" : "Lecture automatique"}
+                >
+                  {isAutoPlaying ? <Pause size={16} /> : <Play size={16} />}
+                  <span className="hidden sm:inline">{isAutoPlaying ? 'Auto: ON' : 'Auto'}</span>
+                </button>
                 <select
                   value={countdownDuration}
                   onChange={(e) => setCountdownDuration(Number(e.target.value))}
                   className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block p-1.5"
                   title="Durée du compte à rebours"
                 >
+                  <option value={0}>Sans</option>
                   <option value={1}>1s</option>
                   <option value={3}>3s</option>
                   <option value={5}>5s</option>

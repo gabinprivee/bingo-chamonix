@@ -1,6 +1,6 @@
 {
-  "name": "Bingo Studio",
+  "name": "bingo chamonix",
   "description": "Générateur de tirages de Bingo avec grille de 90 numéros, historique et export PDF.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["display-capture"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

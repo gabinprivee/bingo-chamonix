@@ -62,6 +62,17 @@ export class AudioEngine {
     osc.start();
     osc.stop(this.ctx.currentTime + 0.05);
   }
+
+  public speakNumber(num: number) {
+    if (!this.isEnabled || !('speechSynthesis' in window)) return;
+    
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(num.toString());
+    utterance.lang = 'fr-FR'; // French localization
+    window.speechSynthesis.speak(utterance);
+  }
 }
 
 export const audioEngine = new AudioEngine();
