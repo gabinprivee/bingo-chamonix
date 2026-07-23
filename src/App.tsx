@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { drawBingoNumber } from './utils/bingo';
 import { exportToPDF } from './utils/pdf';
-import { BingoGame } from './types';
-import { Moon, Sun, Download, Trash2, Ticket, RotateCcw, Maximize, Minimize, BarChart2, Volume2, VolumeX, Play, Pause } from 'lucide-react';
+import { Bingochamonix } from './types';
+import { Moon, Sun, Download, Trash2, Ticket, RotateCcw, Maximize, Minimize, BarChart2, Volume2, VolumeX, Play, Pause, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { audioEngine } from './utils/audio';
 import { DiscordHandMonitor } from './components/DiscordHandMonitor';
@@ -10,7 +10,7 @@ import { DiscordHandMonitor } from './components/DiscordHandMonitor';
 const TARGET_NUMBERS = [1, 4, 13, 14, 26, 28, 30, 52, 56, 62, 69, 70, 77, 85, 89];
 
 export default function App() {
-  const [pastGames, setPastGames] = useState<BingoGame[]>(() => {
+  const [pastGames, setPastGames] = useState<Bingochamonix[]>(() => {
     const saved = localStorage.getItem('bingo_history');
     return saved ? JSON.parse(saved) : [];
   });
@@ -183,7 +183,7 @@ export default function App() {
       setTimeout(() => setShowNewGameConfirm(false), 3000);
       return;
     }
-    const newGame: BingoGame = {
+    const newGame: Bingochamonix = {
       id: crypto.randomUUID(),
       timestamp: Date.now(),
       numbers: currentNumbers
@@ -390,27 +390,27 @@ export default function App() {
               </AnimatePresence>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mt-4">
               <button
                 onClick={handleDraw}
-                disabled={isDrawing || currentNumbers.length >= maxNumber}
-                className="bg-primary-600 hover:bg-primary-700 disabled:bg-primary-400 disabled:cursor-not-allowed text-white px-8 py-4 rounded-2xl font-semibold text-lg transition-all active:scale-95 shadow-lg shadow-primary-600/20 flex items-center gap-3 justify-center min-w-[220px]"
+                disabled={isDrawing || currentNumbers.length >= maxNumber || isAutoPlaying}
+                className="sm:col-span-2 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 disabled:from-primary-300 disabled:to-primary-400 disabled:dark:from-primary-800 disabled:dark:to-primary-900 disabled:cursor-not-allowed text-white px-8 py-5 rounded-3xl font-bold text-lg sm:text-xl transition-all active:scale-95 shadow-xl shadow-primary-500/30 flex items-center gap-4 justify-center"
               >
-                <Ticket size={24} className={isDrawing ? "animate-bounce" : ""} />
-                {isDrawing ? 'Tirage...' : 'Tirer un numéro'}
+                <Ticket size={28} className={isDrawing ? "animate-bounce" : ""} />
+                {isDrawing ? 'Tirage en cours...' : 'Tirer un numéro'}
               </button>
               
               <button
                 onClick={handleNewGame}
                 disabled={isDrawing || currentNumbers.length === 0}
-                className={`px-6 py-4 rounded-2xl font-semibold transition-all flex items-center gap-3 justify-center border-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`px-6 py-5 rounded-3xl font-bold transition-all flex items-center gap-3 justify-center border-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm ${
                   showNewGameConfirm 
-                    ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 border-primary-200 dark:border-primary-800 hover:bg-primary-100 dark:hover:bg-primary-900/40' 
+                    ? 'bg-red-50 dark:bg-red-900/20 text-red-600 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40' 
                     : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700'
                 }`}
               >
-                <RotateCcw size={20} />
-                {showNewGameConfirm ? 'Confirmer ?' : 'Nouvelle Partie'}
+                <RotateCcw size={22} className={showNewGameConfirm ? "animate-spin" : ""} />
+                <span className="text-lg">{showNewGameConfirm ? 'Confirmer ?' : 'Nouveau'}</span>
               </button>
             </div>
           </section>
@@ -462,42 +462,47 @@ export default function App() {
         <div className="lg:col-span-4 flex flex-col gap-6">
           <DiscordHandMonitor />
           
-          {/* Stats Panel */}
+          {/* Controls & Settings Panel */}
           <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                <BarChart2 size={20} className="text-primary-500" />
-                Statistiques
-              </h2>
-              <div className="flex gap-2">
-                <button
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2 mb-4">
+              <Settings size={20} className="text-primary-500" />
+              Paramètres
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
                   onClick={() => setIsAutoPlaying(!isAutoPlaying)}
-                  className={`p-1.5 rounded-lg border text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                  className={`p-3 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-sm ${
                     isAutoPlaying 
-                      ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400' 
-                      : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-primary-500 border-primary-600 text-white shadow-primary-500/30' 
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                   title={isAutoPlaying ? "Arrêter la lecture automatique" : "Lecture automatique"}
                 >
-                  {isAutoPlaying ? <Pause size={16} /> : <Play size={16} />}
-                  <span className="hidden sm:inline">{isAutoPlaying ? 'Auto: ON' : 'Auto'}</span>
-                </button>
+                  {isAutoPlaying ? <Pause size={18} className="animate-pulse" /> : <Play size={18} />}
+                  <span>{isAutoPlaying ? 'Auto: ON' : 'Mode Auto'}</span>
+              </button>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider ml-1">Vitesse (Compte à rebours)</label>
                 <select
                   value={countdownDuration}
                   onChange={(e) => setCountdownDuration(Number(e.target.value))}
-                  className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block p-1.5"
-                  title="Durée du compte à rebours"
+                  className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-sm rounded-xl focus:ring-primary-500 focus:border-primary-500 block w-full p-2 outline-none transition-colors"
                 >
-                  <option value={0}>Sans</option>
-                  <option value={1}>1s</option>
-                  <option value={3}>3s</option>
-                  <option value={5}>5s</option>
+                  <option value={0}>Immédiat (Sans)</option>
+                  <option value={1}>Rapide (1s)</option>
+                  <option value={3}>Normal (3s)</option>
+                  <option value={5}>Lent (5s)</option>
                 </select>
+              </div>
+
+              <div className="flex flex-col gap-1 sm:col-span-2 mt-2">
+                <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider ml-1">Type de Bingo</label>
                 <select
                   value={maxNumber}
                   onChange={(e) => {
                     if (currentNumbers.length > 0) {
-                      if (!confirm("Changer le nombre maximum réinitialisera la partie en cours. Continuer ?")) return;
+                      if (!confirm("Changer le type de bingo réinitialisera la partie en cours. Continuer ?")) return;
                       setPastGames(prev => [{
                         id: crypto.randomUUID(),
                         timestamp: Date.now(),
@@ -507,12 +512,31 @@ export default function App() {
                     }
                     setMaxNumber(Number(e.target.value));
                   }}
-                  className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block p-1.5"
-                  title="Maximum de numéros"
+                  className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-sm rounded-xl focus:ring-primary-500 focus:border-primary-500 block w-full p-2 outline-none transition-colors"
                 >
-                  <option value={75}>75 (US)</option>
-                  <option value={90}>90 (EU)</option>
+                  <option value={75}>Bingo 75 (Américain)</option>
+                  <option value={90}>Bingo 90 (Européen)</option>
                 </select>
+              </div>
+            </div>
+          </section>
+
+          {/* Stats Panel */}
+          <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col">
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2 mb-4">
+              <BarChart2 size={20} className="text-primary-500" />
+              Statistiques
+            </h2>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-2xl border border-gray-100 dark:border-gray-700/50 flex flex-col items-center justify-center relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-transparent to-gray-100 dark:to-gray-800 opacity-50"></div>
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1 z-10">Dernier</span>
+                <span className="text-3xl font-black text-gray-800 dark:text-gray-100 z-10">{lastNumber || "-"}</span>
+              </div>
+              <div className="bg-primary-50 dark:bg-primary-900/20 p-4 rounded-2xl border border-primary-100 dark:border-primary-800/50 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-transparent to-primary-100 dark:to-primary-900/40 opacity-50"></div>
+                <span className="text-xs text-primary-600 dark:text-primary-400 font-medium uppercase tracking-wider mb-1 leading-tight z-10">N° + Fréquent</span>
+                <span className="text-3xl font-black text-primary-700 dark:text-primary-300 z-10">{getMostFrequentNumber()}</span>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -524,16 +548,19 @@ export default function App() {
                 <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Impairs</span>
                 <span className="text-xl font-bold text-gray-800 dark:text-gray-100">{oddCount}</span>
               </div>
-              <div className="bg-primary-50 dark:bg-primary-900/20 p-3 rounded-2xl border border-primary-100 dark:border-primary-800/50 flex flex-col items-center justify-center text-center">
-                <span className="text-[10px] sm:text-xs text-primary-600 dark:text-primary-400 font-medium uppercase tracking-wider mb-1 leading-tight">N° + Fréquent</span>
-                <span className="text-xl font-bold text-primary-700 dark:text-primary-300">{getMostFrequentNumber()}</span>
+              <div className="bg-gray-50 dark:bg-gray-700/30 p-3 rounded-2xl border border-gray-100 dark:border-gray-700/50 flex flex-col items-center justify-center">
+                <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Restants</span>
+                <span className="text-xl font-bold text-gray-800 dark:text-gray-100">{maxNumber - currentNumbers.length}</span>
               </div>
             </div>
             
             {currentNumbers.length < maxNumber && (
-              <div className="mt-4 bg-sky-50 dark:bg-sky-900/20 p-3.5 rounded-xl border border-sky-100 dark:border-sky-800/50 flex items-center justify-between">
-                <span className="text-sm text-sky-700 dark:text-sky-300 font-medium">Probabilité d'un N° spécifique</span>
-                <span className="text-sm font-bold text-sky-800 dark:text-sky-200 bg-white dark:bg-gray-800 px-2 py-1 rounded-md shadow-sm">
+              <div className="mt-4 bg-sky-50 dark:bg-sky-900/20 p-4 rounded-2xl border border-sky-100 dark:border-sky-800/50 flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-sm text-sky-700 dark:text-sky-300 font-semibold">Probabilité</span>
+                  <span className="text-xs text-sky-600 dark:text-sky-400 opacity-80">d'un tirage au sort</span>
+                </div>
+                <span className="text-lg font-black text-sky-800 dark:text-sky-200 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-xl shadow-sm">
                   {((1 / (maxNumber - currentNumbers.length)) * 100).toFixed(2)}%
                 </span>
               </div>

@@ -41,8 +41,12 @@ async function startServer() {
               data: base64Data
             }
           },
-          "Look at this screenshot of Discord. Is there a user who has 'raised their hand' (e.g. indicated by a hand icon next to their name or in the UI)? If yes, what is their username? If no one has raised their hand, say 'NONE'. Answer ONLY with the username of the person who raised their hand, or 'NONE' if no one has."
-        ]
+          "Examine this screenshot of a voice channel or video call (like Discord). Look closely at the list of participants. Find anyone who has a 'raised hand' icon next to their name. Return ONLY their username. If absolutely no one has a raised hand, return 'NONE'."
+        ],
+        config: {
+          systemInstruction: "You are a precise screenshot analyzer. You always answer with ONLY a single username, or the exact word 'NONE'. Look very closely for small hand icons next to user names.",
+          temperature: 0.1
+        }
       });
 
       const text = response.text?.trim() || "NONE";

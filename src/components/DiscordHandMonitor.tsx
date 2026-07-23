@@ -6,6 +6,7 @@ export function DiscordHandMonitor() {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [status, setStatus] = useState<string>('En attente');
   const [detectedUser, setDetectedUser] = useState<string | null>(null);
+  const [debugImage, setDebugImage] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -15,9 +16,7 @@ export function DiscordHandMonitor() {
   const startMonitoring = async () => {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          displaySurface: 'monitor', // or 'window'
-        }
+        video: true
       });
       
       streamRef.current = stream;
@@ -38,9 +37,11 @@ export function DiscordHandMonitor() {
     } catch (err: any) {
       console.error("Erreur capture d'écran:", err);
       if (err.name === 'NotAllowedError' || err.message.includes('permission')) {
-        setStatus("Erreur: Permission refusée. Si vous êtes dans l'aperçu, essayez d'ouvrir l'app dans un nouvel onglet.");
+        setStatus("Erreur: Permission de capture d'écran refusée par le navigateur (iframe).");
+        setIsMonitoring(false);
       } else {
         setStatus("Erreur: Impossible de capturer l'écran");
+        setIsMonitoring(false);
       }
     }
   };
@@ -85,23 +86,34 @@ export function DiscordHandMonitor() {
   };
 
   const captureAndAnalyze = async () => {
-    if (!videoRef.current || !canvasRef.current || !isMonitoring) return;
+    if (!videoRef.current || !canvasRef.current || !isMonitoring || videoRef.current.videoWidth === 0) return;
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
     
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Resize if too large
+    const MAX_WIDTH = 1280;
+    let width = video.videoWidth;
+    let height = video.videoHeight;
+    
+    if (width > MAX_WIDTH) {
+      height = Math.round((height * MAX_WIDTH) / width);
+      width = MAX_WIDTH;
+    }
+    
+    canvas.width = width;
+    canvas.height = height;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, width, height);
     
     const base64Image = canvas.toDataURL('image/jpeg', 0.5); // compress
     
     try {
       setStatus("Analyse de l'image...");
+      setDebugImage(base64Image);
       const response = await fetch('/api/detect-hand', {
         method: 'POST',
         headers: {
@@ -115,6 +127,7 @@ export function DiscordHandMonitor() {
       if (data.result && data.result !== 'NONE' && !data.result.includes('NONE')) {
         setDetectedUser(data.result);
         triggerConfetti();
+        stopMonitoring();
         // Give some time before dismissing
         setTimeout(() => setDetectedUser(null), 10000);
       }
@@ -133,32 +146,52 @@ export function DiscordHandMonitor() {
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-between">
+      <div className="bg-white dark:bg-gray-800 p-5 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-xl ${isMonitoring ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
-            <Monitor size={20} />
+          <div className={`p-3 rounded-2xl ${isMonitoring ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+            <Monitor size={22} />
           </div>
           <div>
-            <h3 className="font-medium text-sm">Moniteur Discord (Main levée)</h3>
+            <h3 className="font-semibold text-sm text-gray-800 dark:text-gray-200">Moniteur Discord (Main levée)</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">{status}</p>
+            {status.includes('Erreur: Permission') && (
+              <button 
+                onClick={() => window.open(window.location.href, '_blank')}
+                className="mt-1 text-xs text-primary-500 hover:text-primary-600 underline font-semibold flex items-center gap-1"
+              >
+                Ouvrir dans un nouvel onglet pour autoriser
+              </button>
+            )}
           </div>
         </div>
         
         <button
           onClick={isMonitoring ? stopMonitoring : startMonitoring}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${
             isMonitoring 
-              ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40' 
-              : 'bg-primary-50 text-primary-600 hover:bg-primary-100 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/40'
+              ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20' 
+              : 'bg-primary-500 text-white hover:bg-primary-600 shadow-primary-500/20'
           }`}
         >
           {isMonitoring ? 'Arrêter' : 'Démarrer'}
         </button>
       </div>
       
-      {/* Hidden elements for capture */}
-      <video ref={videoRef} style={{ display: 'none' }} muted playsInline />
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
+      {debugImage && (
+        <div className="mt-2 mb-6 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <span className="uppercase tracking-wider">Aperçu capture Discord</span>
+            <button onClick={() => setDebugImage(null)} className="hover:text-gray-700 dark:hover:text-gray-200 transition-colors bg-white dark:bg-gray-700 p-1 rounded-md shadow-sm border border-gray-200 dark:border-gray-600"><X size={14} /></button>
+          </div>
+          <img src={debugImage} alt="Debug capture" className="w-full max-h-48 object-contain bg-black" />
+        </div>
+      )}
+      
+      {/* Hidden elements for capture - avoid display none which can break some browser renderers */}
+      <div className="absolute top-0 left-0 w-0 h-0 overflow-hidden opacity-0 pointer-events-none">
+        <video ref={videoRef} muted playsInline autoPlay />
+        <canvas ref={canvasRef} />
+      </div>
       
       {/* Alert Overlay */}
       {detectedUser && (

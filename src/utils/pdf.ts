@@ -1,8 +1,8 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { BingoGame } from '../types';
+import { Bingochamonix } from '../types';
 
-export const exportToPDF = (currentNumbers: number[], pastGames: BingoGame[], themeColor: string = 'rose') => {
+export const exportToPDF = (currentNumbers: number[], pastGames: Bingochamonix[], themeColor: string = 'rose') => {
   const doc = new jsPDF();
   
   const THEME_COLORS: Record<string, [number, number, number]> = {
