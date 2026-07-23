@@ -7,6 +7,8 @@ export function DiscordHandMonitor() {
   const [status, setStatus] = useState<string>('En attente');
   const [detectedUser, setDetectedUser] = useState<string | null>(null);
   const [debugImage, setDebugImage] = useState<string | null>(null);
+  const [participants, setParticipants] = useState<string>("");
+  const [manualUser, setManualUser] = useState<string>("");
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -85,14 +87,31 @@ export function DiscordHandMonitor() {
     }, 250);
   };
 
+  const handleManualTrigger = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualUser.trim()) return;
+    setDetectedUser(manualUser);
+    triggerConfetti();
+    setTimeout(() => setDetectedUser(null), 10000);
+    setManualUser('');
+  };
+
+  const isAnalyzing = useRef(false);
   const captureAndAnalyze = async () => {
-    if (!videoRef.current || !canvasRef.current || !isMonitoring || videoRef.current.videoWidth === 0) return;
+    if (isAnalyzing.current) return;
+    isAnalyzing.current = true;
+    if (!videoRef.current || !canvasRef.current || !isMonitoring) return;
+    if (videoRef.current.videoWidth === 0) {
+      console.warn("videoWidth is 0");
+      setStatus("En attente de la source vidéo...");
+      return;
+    }
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
     
     // Resize if too large
-    const MAX_WIDTH = 1280;
+    const MAX_WIDTH = 1920;
     let width = video.videoWidth;
     let height = video.videoHeight;
     
@@ -109,7 +128,7 @@ export function DiscordHandMonitor() {
     
     ctx.drawImage(video, 0, 0, width, height);
     
-    const base64Image = canvas.toDataURL('image/jpeg', 0.5); // compress
+    const base64Image = canvas.toDataURL('image/jpeg', 0.8); // compress
     
     try {
       setStatus("Analyse de l'image...");
@@ -119,12 +138,17 @@ export function DiscordHandMonitor() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ imageBase64: base64Image })
+        body: JSON.stringify({ imageBase64: base64Image, participants })
       });
       
       const data = await response.json();
       
-      if (data.result && data.result !== 'NONE' && !data.result.includes('NONE')) {
+      if (!response.ok) {
+        throw new Error(data.error || "Server error");
+      }
+      
+      const resultText = data.result ? data.result.toUpperCase() : "NONE";
+            if (resultText && !resultText.includes('NONE') && !resultText.includes('NO ONE') && !resultText.includes('NOBODY')) {
         setDetectedUser(data.result);
         triggerConfetti();
         stopMonitoring();
@@ -134,7 +158,9 @@ export function DiscordHandMonitor() {
       setStatus('Surveillance en cours...');
     } catch (err) {
       console.error(err);
-      setStatus("Erreur d'analyse");
+      setStatus("Erreur d'analyse: " + (err.message || "Inconnue"));
+    } finally {
+      isAnalyzing.current = false;
     }
   };
 
@@ -169,14 +195,51 @@ export function DiscordHandMonitor() {
           onClick={isMonitoring ? stopMonitoring : startMonitoring}
           className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${
             isMonitoring 
-              ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20' 
-              : 'bg-primary-500 text-white hover:bg-primary-600 shadow-primary-500/20'
+               ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20' 
+               : 'bg-primary-500 text-white hover:bg-primary-600 shadow-primary-500/20'
           }`}
         >
           {isMonitoring ? 'Arrêter' : 'Démarrer'}
         </button>
       </div>
+
+      <div className="mb-6">
+        <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block uppercase tracking-wider ml-1">
+          Liste des participants (Optionnel)
+        </label>
+        <textarea
+          value={participants}
+          onChange={(e) => setParticipants(e.target.value)}
+          placeholder="Ex: Gabin, Alice, Bob (aide l'IA à trouver qui lève la main)"
+          className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-sm rounded-xl focus:ring-primary-500 focus:border-primary-500 block p-3 outline-none transition-colors"
+          rows={2}
+          disabled={isMonitoring}
+        />
+        <p className="text-[10px] text-gray-400 mt-1 ml-1">Séparés par des virgules. Recommandé si la détection échoue.</p>
+      </div>
       
+      <div className="mb-6">
+        <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block uppercase tracking-wider ml-1">
+          Déclenchement Manuel
+        </label>
+        <form onSubmit={handleManualTrigger} className="flex gap-2">
+          <input
+            type="text"
+            value={manualUser}
+            onChange={(e) => setManualUser(e.target.value)}
+            placeholder="Entrez un nom ou numéro..."
+            className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-sm rounded-xl focus:ring-primary-500 focus:border-primary-500 block p-3 outline-none transition-colors"
+          />
+          <button
+            type="submit"
+            disabled={!manualUser.trim()}
+            className="px-4 py-2 bg-purple-500 text-white rounded-xl text-sm font-bold hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm shadow-purple-500/20"
+          >
+            Déclencher
+          </button>
+        </form>
+      </div>
+
       {debugImage && (
         <div className="mt-2 mb-6 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden shadow-sm">
           <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
